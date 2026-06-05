@@ -1,4 +1,4 @@
-import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore, roleNames } from '@/store/authStore';
 import {
   FileText,
@@ -42,7 +42,11 @@ export function StatusBadge({ status }: { status: string }) {
   );
 }
 
-export default function Layout() {
+interface LayoutProps {
+  children: React.ReactNode;
+}
+
+export default function Layout({ children }: LayoutProps) {
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const navigate = useNavigate();
@@ -101,7 +105,7 @@ export default function Layout() {
       
       <main className="flex-1 overflow-auto">
         <div className="p-8">
-          <Outlet />
+          {children}
         </div>
       </main>
     </div>

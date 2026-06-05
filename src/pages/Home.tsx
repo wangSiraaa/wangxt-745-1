@@ -10,12 +10,13 @@ import {
   TrendingUp,
   CheckCircle,
   Clock,
+  type LucideIcon,
 } from 'lucide-react';
 
 interface StatCardProps {
   title: string;
   value: number;
-  icon: React.ComponentType<{ size?: number }>;
+  icon: LucideIcon;
   color: string;
 }
 
