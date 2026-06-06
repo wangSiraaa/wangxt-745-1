@@ -119,4 +119,50 @@ router.post('/:id/report-exception', (req: Request, res: Response) => {
   }
 });
 
+router.post('/:id/withdraw', (req: Request, res: Response) => {
+  try {
+    const userId = req.headers['x-user-id'] as string;
+    const declaration = declarationService.withdrawDeclaration(
+      req.params.id,
+      userId,
+      req.body.reason || ''
+    );
+    res.json({ success: true, data: declaration });
+  } catch (error) {
+    res.status(400).json({ success: false, error: (error as Error).message });
+  }
+});
+
+router.post('/:id/rewrite', (req: Request, res: Response) => {
+  try {
+    const userId = req.headers['x-user-id'] as string;
+    const declaration = declarationService.rewriteDeclaration(
+      req.params.id,
+      userId,
+      req.body
+    );
+    res.status(201).json({ success: true, data: declaration });
+  } catch (error) {
+    res.status(400).json({ success: false, error: (error as Error).message });
+  }
+});
+
+router.post('/:id/submit-rewrite', (req: Request, res: Response) => {
+  try {
+    const declaration = declarationService.submitRewrite(req.params.id);
+    res.json({ success: true, data: declaration });
+  } catch (error) {
+    res.status(400).json({ success: false, error: (error as Error).message });
+  }
+});
+
+router.get('/:id/rewrite-history', (req: Request, res: Response) => {
+  try {
+    const history = declarationService.getRewriteHistory(req.params.id);
+    res.json({ success: true, data: history });
+  } catch (error) {
+    res.status(500).json({ success: false, error: (error as Error).message });
+  }
+});
+
 export default router;

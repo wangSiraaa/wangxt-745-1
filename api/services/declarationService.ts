@@ -24,6 +24,11 @@ export interface QuarantineDeclaration {
   exception_reason?: string;
   review_comment?: string;
   current_status: string;
+  withdraw_reason?: string;
+  withdraw_time?: string;
+  withdraw_by?: string;
+  rewrite_count: number;
+  original_declaration_id?: string;
   created_at: string;
   updated_at: string;
 }
@@ -370,6 +375,110 @@ export class DeclarationService {
     
     sql += ' ORDER BY created_at DESC';
     return this.db.prepare(sql).all(...params) as ExceptionReview[];
+  }
+
+  withdrawDeclaration(declarationId: string, userId: string, reason: string): QuarantineDeclaration {
+    const decl = this.getDeclarationById(declarationId);
+    if (!decl) {
+      throw new Error('申报单不存在');
+    }
+    
+    const allowedStatuses = ['declared', 'immune_checked', 'vehicle_bound', 'rewrite_pending'];
+    if (!allowedStatuses.includes(decl.current_status)) {
+      throw new Error('当前状态不允许撤回');
+    }
+
+    const stmt = this.db.prepare(`
+      UPDATE quarantine_declarations 
+      SET current_status = 'withdrawn', 
+          withdraw_reason = ?, 
+          withdraw_time = datetime('now'), 
+          withdraw_by = ?,
+          updated_at = datetime('now')
+      WHERE id = ?
+    `);
+    stmt.run(reason, userId, declarationId);
+    
+    return this.getDeclarationById(declarationId)!;
+  }
+
+  rewriteDeclaration(declarationId: string, userId: string, data?: {
+    destination?: string;
+    receiver?: string;
+    receiver_phone?: string;
+  }): QuarantineDeclaration {
+    const originalDecl = this.getDeclarationById(declarationId);
+    if (!originalDecl) {
+      throw new Error('原申报单不存在');
+    }
+    
+    if (originalDecl.current_status !== 'withdrawn') {
+      throw new Error('只有已撤回的申报单才能重办');
+    }
+
+    const id = generateId('decl');
+    const declarationNo = this.generateDeclarationNo();
+    
+    const newDeclData = {
+      id,
+      declaration_no: declarationNo,
+      batch_id: originalDecl.batch_id,
+      declarant_id: userId,
+      destination: data?.destination || originalDecl.destination,
+      receiver: data?.receiver || originalDecl.receiver,
+      receiver_phone: data?.receiver_phone || originalDecl.receiver_phone,
+      original_declaration_id: declarationId,
+      rewrite_count: (originalDecl.rewrite_count || 0) + 1,
+      current_status: 'rewrite_pending' as const,
+    };
+
+    const insertStmt = this.db.prepare(`
+      INSERT INTO quarantine_declarations 
+      (id, declaration_no, batch_id, declarant_id, destination, receiver, receiver_phone, 
+       original_declaration_id, rewrite_count, current_status)
+      VALUES (@id, @declaration_no, @batch_id, @declarant_id, @destination, @receiver, @receiver_phone,
+              @original_declaration_id, @rewrite_count, @current_status)
+    `);
+    insertStmt.run(newDeclData);
+
+    const updateStmt = this.db.prepare(`
+      UPDATE quarantine_declarations 
+      SET rewrite_count = rewrite_count + 1,
+          updated_at = datetime('now')
+      WHERE id = ?
+    `);
+    updateStmt.run(declarationId);
+    
+    return this.getDeclarationById(id)!;
+  }
+
+  submitRewrite(declarationId: string): QuarantineDeclaration {
+    const decl = this.getDeclarationById(declarationId);
+    if (!decl) {
+      throw new Error('申报单不存在');
+    }
+    
+    if (decl.current_status !== 'rewrite_pending') {
+      throw new Error('只有待提交的重办申报单才能提交');
+    }
+
+    const stmt = this.db.prepare(`
+      UPDATE quarantine_declarations 
+      SET current_status = 'declared',
+          updated_at = datetime('now')
+      WHERE id = ?
+    `);
+    stmt.run(declarationId);
+    
+    return this.getDeclarationById(declarationId)!;
+  }
+
+  getRewriteHistory(originalDeclarationId: string): QuarantineDeclaration[] {
+    return this.db.prepare(`
+      SELECT * FROM quarantine_declarations 
+      WHERE original_declaration_id = ? 
+      ORDER BY created_at DESC
+    `).all(originalDeclarationId) as QuarantineDeclaration[];
   }
 }
 

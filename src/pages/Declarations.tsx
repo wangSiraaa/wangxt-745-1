@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import { StatusBadge } from '@/components/Layout';
-import { Plus, Eye, Check, Truck, Award, AlertCircle } from 'lucide-react';
+import { Plus, Eye, Check, Truck, Award, AlertCircle, Undo2, RefreshCw, Send } from 'lucide-react';
 
 export default function Declarations() {
   const user = useAuthStore((state) => state.user);
@@ -20,6 +20,15 @@ export default function Declarations() {
     receiver_phone: '',
   });
   const [error, setError] = useState('');
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [showRewriteModal, setShowRewriteModal] = useState(false);
+  const [selectedDeclaration, setSelectedDeclaration] = useState<any>(null);
+  const [withdrawReason, setWithdrawReason] = useState('');
+  const [rewriteForm, setRewriteForm] = useState({
+    destination: '',
+    receiver: '',
+    receiver_phone: '',
+  });
 
   useEffect(() => {
     loadData();
@@ -119,6 +128,62 @@ export default function Declarations() {
     }
   };
 
+  const handleWithdraw = async (decl: any) => {
+    setSelectedDeclaration(decl);
+    setWithdrawReason('');
+    setShowWithdrawModal(true);
+  };
+
+  const confirmWithdraw = async () => {
+    if (!withdrawReason.trim()) {
+      alert('请输入撤回原因');
+      return;
+    }
+    
+    try {
+      await api.declarations.withdraw(selectedDeclaration.id, withdrawReason);
+      alert('撤回成功');
+      setShowWithdrawModal(false);
+      setWithdrawReason('');
+      loadData();
+    } catch (err) {
+      alert((err as Error).message);
+    }
+  };
+
+  const handleRewrite = async (decl: any) => {
+    setSelectedDeclaration(decl);
+    setRewriteForm({
+      destination: decl.destination,
+      receiver: decl.receiver || '',
+      receiver_phone: decl.receiver_phone || '',
+    });
+    setShowRewriteModal(true);
+  };
+
+  const confirmRewrite = async () => {
+    try {
+      const result = await api.declarations.rewrite(selectedDeclaration.id, rewriteForm);
+      alert('重办申请已创建，请提交');
+      setShowRewriteModal(false);
+      loadData();
+    } catch (err) {
+      alert((err as Error).message);
+    }
+  };
+
+  const handleSubmitRewrite = async (id: string) => {
+    if (!confirm('确定提交重办的申报单吗？')) return;
+    
+    try {
+      await api.declarations.submitRewrite(id);
+      alert('提交成功');
+      loadData();
+    } catch (err) {
+      alert((err as Error).message);
+    }
+  };
+
   if (loading) {
     return <div className="text-gray-500">加载中...</div>;
   }
@@ -210,6 +275,33 @@ export default function Declarations() {
                           <AlertCircle size={18} />
                         </button>
                       )}
+                      {['declared', 'immune_checked', 'vehicle_bound', 'rewrite_pending'].includes(decl.current_status) && user?.role === 'declarant' && (
+                        <button
+                          onClick={() => handleWithdraw(decl)}
+                          className="p-1.5 text-yellow-600 hover:bg-yellow-50 rounded"
+                          title="撤回"
+                        >
+                          <Undo2 size={18} />
+                        </button>
+                      )}
+                      {decl.current_status === 'withdrawn' && user?.role === 'declarant' && (
+                        <button
+                          onClick={() => handleRewrite(decl)}
+                          className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded"
+                          title="重办"
+                        >
+                          <RefreshCw size={18} />
+                        </button>
+                      )}
+                      {decl.current_status === 'rewrite_pending' && user?.role === 'declarant' && (
+                        <button
+                          onClick={() => handleSubmitRewrite(decl.id)}
+                          className="p-1.5 text-green-600 hover:bg-green-50 rounded"
+                          title="提交重办"
+                        >
+                          <Send size={18} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -295,6 +387,124 @@ export default function Declarations() {
                   className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                 >
                   提交申报
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showWithdrawModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold text-gray-800 mb-6">撤回申报</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              申报编号：{selectedDeclaration?.declaration_no}
+            </p>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">撤回原因</label>
+                <textarea
+                  value={withdrawReason}
+                  onChange={(e) => setWithdrawReason(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                  rows={4}
+                  placeholder="请输入撤回原因"
+                  required
+                />
+              </div>
+              
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded-lg text-sm">
+                  {error}
+                </div>
+              )}
+              
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowWithdrawModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmWithdraw}
+                  className="flex-1 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
+                >
+                  确认撤回
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showRewriteModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold text-gray-800 mb-6">重办申报</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              原申报编号：{selectedDeclaration?.declaration_no}
+            </p>
+            
+            <form className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">目的地</label>
+                <input
+                  type="text"
+                  value={rewriteForm.destination}
+                  onChange={(e) => setRewriteForm({ ...rewriteForm, destination: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  placeholder="请输入目的地"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">收货方</label>
+                <input
+                  type="text"
+                  value={rewriteForm.receiver}
+                  onChange={(e) => setRewriteForm({ ...rewriteForm, receiver: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  placeholder="请输入收货方名称"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">联系电话</label>
+                <input
+                  type="text"
+                  value={rewriteForm.receiver_phone}
+                  onChange={(e) => setRewriteForm({ ...rewriteForm, receiver_phone: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  placeholder="请输入联系电话"
+                />
+              </div>
+              
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded-lg text-sm">
+                  {error}
+                </div>
+              )}
+              
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowRewriteModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmRewrite}
+                  className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                >
+                  创建重办申请
                 </button>
               </div>
             </form>

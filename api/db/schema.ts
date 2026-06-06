@@ -70,8 +70,14 @@ CREATE TABLE IF NOT EXISTS quarantine_declarations (
   review_comment TEXT,
   current_status TEXT DEFAULT 'declared' CHECK (current_status IN (
     'declared', 'immune_checked', 'vehicle_bound', 'certificate_issued',
-    'in_transit', 'received', 'exception', 'reviewed', 'completed'
+    'in_transit', 'received', 'exception', 'reviewed', 'completed',
+    'withdrawn', 'rewrite_pending'
   )),
+  withdraw_reason TEXT,
+  withdraw_time TEXT,
+  withdraw_by TEXT,
+  rewrite_count INTEGER DEFAULT 0,
+  original_declaration_id TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now')),
   FOREIGN KEY (batch_id) REFERENCES pig_batches(id),

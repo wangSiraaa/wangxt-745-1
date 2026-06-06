@@ -104,6 +104,22 @@ export const api = {
       request<{ success: boolean; data: any[] }>(`/declarations/${id}/receipts`),
     getReviews: (id: string) => 
       request<{ success: boolean; data: any[] }>(`/declarations/${id}/reviews`),
+    withdraw: (id: string, reason: string) => 
+      request<{ success: boolean; data: any }>(`/declarations/${id}/withdraw`, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      }),
+    rewrite: (id: string, data?: any) => 
+      request<{ success: boolean; data: any }>(`/declarations/${id}/rewrite`, {
+        method: 'POST',
+        body: JSON.stringify(data || {}),
+      }),
+    submitRewrite: (id: string) => 
+      request<{ success: boolean; data: any }>(`/declarations/${id}/submit-rewrite`, {
+        method: 'POST',
+      }),
+    getRewriteHistory: (id: string) => 
+      request<{ success: boolean; data: any[] }>(`/declarations/${id}/rewrite-history`),
   },
   
   reviews: {
